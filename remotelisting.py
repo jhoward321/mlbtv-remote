@@ -8,7 +8,7 @@ from blessings import Terminal
 import time
 import datetime
 from twisted.internet.protocol import Protocol
-from MLBviewer import MLBGameTime
+from MLBviewer import MLBGameTime, MLBSchedule, MLBUrlError, MLBXmlError
 
 #by default we are going to rely on mlbviewer settings on destination
 #future versions will add support for all the keyboard shortcuts and maybe remote config changes
@@ -33,12 +33,23 @@ def getGames():
 
 	#once I'm farther along I will add time offset support
 
+	view_day = now + localoffset - eastoffset
+	sched_date = (view_day.year, view_day.month, view_day.day)
+	#print view_day
+	#print sched_date
+
+	#get game listing for requested day (other dates to be added)
+	try:
+		mlbsched = MLBSchedule(ymd_tuple=sched_date)
+		#print mlbsched
+		listings = mlbsched.getListings()
+	except (MLBUrlError, MLBXmlError):
+		print "Could not fetch schedule"
+		return -1
+
+#def main():
+#	t = Terminal()
+
+if __name__ == "__main__":
+	getGames()
 	
-
-
-def main():
-	t = Terminal()
-
-
-#this handles curses init and cleanup automatically
-#wrapper(main)
