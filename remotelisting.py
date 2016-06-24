@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-#import curses
-#from curses import wrapper
-#import curses.textpad
+import curses
+from curses import wrapper
+import curses.textpad
 #import re
-from blessings import Terminal
+#from blessings import Terminal
 import time
 import os
 import re
@@ -13,7 +13,7 @@ import datetime
 from twisted.internet.protocol import Protocol
 from MLBviewer import MLBConfig, MLBGameTime, MLBSchedule, MLBUrlError, MLBXmlError
 from MLBviewer import AUTHDIR, AUTHFILE, TEAMCODES, DEFAULT_SPEED
-
+from MLBviewer import *
 #by default we are going to rely on mlbviewer settings on destination
 #future versions will add support for all the keyboard shortcuts and maybe remote config changes
 
@@ -113,7 +113,23 @@ def getFullConfig():
 		
 		return config
 
-def getGames():
+def getGames(listings):
+	Games = []
+	for i in range(len(listings)):
+		Games.append(Listing(listings[i]))
+		#each listing is a list of different info about game
+		#0 is the home and away teams
+		#1 is the start time
+		#2 is available TV streams
+		#3 is radio streams
+		#4 is nothing?, 5 is game status ie if game is in progress, pregame, etc
+		#6 is an easy to parse general info about game
+		#7 is whether or not media is off or on
+		# rest is mostly junk, 10 is available second audio feeds where available
+		#print str(listings[i][10]) + '\n'
+		#print Games[i].s
+	return Games
+def getListings():
 
 	#get date and time information for local and eastern timezones
 	now = datetime.datetime.now()
@@ -141,43 +157,31 @@ def getGames():
 	except (MLBUrlError, MLBXmlError):
 		print "Could not fetch schedule"
 		return -1
-	Games = []
-	for i in range(len(listings)):
-		Games.append(Listing(listings[i]))
-		#each listing is a list of different info about game
-		#0 is the home and away teams
-		#1 is the start time
-		#2 is available TV streams
-		#3 is radio streams
-		#4 is nothing?, 5 is game status ie if game is in progress, pregame, etc
-		#6 is an easy to parse general info about game
-		#7 is whether or not media is off or on
-		# rest is mostly junk, 10 is available second audio feeds where available
-		#print str(listings[i][10]) + '\n'
-		#print Games[i].s
-
+	
 	#eventually I want to get the listings remotely from server using server config
 	#i think i can send my own objects with perspective broker and call remote methods
-	return Games
+	#return Games
+	return listings
 #function called by curses
 def setupWindow(myscr,mycfg, games):
 	#need to configure myscreen first
 	listwin = MLBListWin(myscr, mycfg, games)
-def main():
-	t = Terminal()
-	games = getGames()
+def main(myscr,mycfg, games):
+	#t = Terminal()
+	#games = getGames()
 	# for i in range(len(games)):
 	# 	with t.location(0,t.height + i):
 	# 		print games[i].s
-	with t.fullscreen():
-		with t.location(0,0):
-			print t.underline(games[0].s) 
-	while(1):
-		x=1
-
+	#with t.fullscreen():
+	#	with t.location(0,0):
+	#		print t.underline(games[0].s) 
+	
 	#might be able to use interface from MLBListWin, MLBTopWin,opt,help etc
-
+	listwin = MLBListWin(myscr, mycfg, games)
 
 if __name__ == "__main__":
 	#getGames()
-	main()
+	#main()
+	minconfig = getConfig()
+	listings = getListings()
+	wrapper(main, minconfig, listings)
