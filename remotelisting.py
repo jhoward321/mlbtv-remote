@@ -57,7 +57,61 @@ def getConfig():
 	return config
 #function to clean up listing into a more useful and readable format
 #def niceListing(origList):
-	
+def getFullConfig():
+		config_dir = os.path.join(os.environ['HOME'], AUTHDIR)
+		config_file = os.path.join(config_dir, AUTHFILE)
+		mlbviewer_defaults = {'speed': DEFAULT_SPEED,
+	                  'video_player': DEFAULT_V_PLAYER,
+	                  'audio_player': DEFAULT_A_PLAYER,
+	                  'audio_follow': [],
+	                  'alt_audio_follow': [],
+	                  'video_follow': [],
+	                  'blackout': [],
+	                  'favorite': [],
+	                  'use_color': 1,
+	                  'favorite_color': 'cyan',
+	                  'free_color': 'green',
+	                  'division_color' : 'red',
+	                  'highlight_division' : 0,
+	                  'bg_color': 'xterm',
+	                  'show_player_command': 0,
+	                  'debug': 0,
+	                  'curses_debug': 0,
+	                  'wiggle_timer': 0.5,
+	                  'x_display': '',
+	                  'top_plays_player': '',
+	                  'max_bps': 2500,
+	                  'min_bps': 1200,
+	                  'live_from_start': 0,
+	                  'use_nexdef': 0,
+	                  'use_wired_web': 1,
+	                  'adaptive_stream': 0,
+	                  'coverage' : 'home',
+	                  'show_inning_frames': 1,
+	                  'use_librtmp': 0,
+	                  'no_lirc': 0,
+	                  'postseason': 0,
+	                  'milbtv' : 0,
+	                  'rss_browser': 'firefox -new-tab %s',
+	                  'flash_browser': DEFAULT_FLASH_BROWSER}
+
+		#create a default config then check for existing
+		config = MLBConfig(mlbviewer_defaults)
+		
+		try:
+			os.lstat(config_file)
+		except:
+			try:
+				os.lstat(config_dir)
+			except:
+				dir = config_dir
+			else:
+				dir = None
+			config.new(config_file, mlbviewer_defaults, dir)
+		
+		config.loads(config_file)
+		
+		return config
 
 def getGames():
 
@@ -99,15 +153,31 @@ def getGames():
 		#6 is an easy to parse general info about game
 		#7 is whether or not media is off or on
 		# rest is mostly junk, 10 is available second audio feeds where available
-		print str(listings[i][10]) + '\n'
+		#print str(listings[i][10]) + '\n'
 		#print Games[i].s
 
 	#eventually I want to get the listings remotely from server using server config
 	#i think i can send my own objects with perspective broker and call remote methods
+	return Games
+#function called by curses
+def setupWindow(myscr,mycfg, games):
+	#need to configure myscreen first
+	listwin = MLBListWin(myscr, mycfg, games)
+def main():
+	t = Terminal()
+	games = getGames()
+	# for i in range(len(games)):
+	# 	with t.location(0,t.height + i):
+	# 		print games[i].s
+	with t.fullscreen():
+		with t.location(0,0):
+			print t.underline(games[0].s) 
+	while(1):
+		x=1
 
-#def main():
-#	t = Terminal()
+	#might be able to use interface from MLBListWin, MLBTopWin,opt,help etc
+
 
 if __name__ == "__main__":
-	getGames()
-	
+	#getGames()
+	main()
