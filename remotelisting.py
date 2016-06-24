@@ -7,6 +7,8 @@
 from blessings import Terminal
 import time
 import os
+import re
+import json
 import datetime
 from twisted.internet.protocol import Protocol
 from MLBviewer import MLBConfig, MLBGameTime, MLBSchedule, MLBUrlError, MLBXmlError
@@ -25,6 +27,19 @@ from MLBviewer import AUTHDIR, AUTHFILE, TEAMCODES, DEFAULT_SPEED
 
 #for client just need a minimum config for listings
 #might eventually get these from server so dont need mlbviewer on client
+class Listing:
+	def __init__(self, uglyGame):
+		self.home = uglyGame[0]['home']
+		self.away = uglyGame[0]['away']
+		self.s = s = uglyGame[1].strftime('%l:%M %p') + ': ' +\
+       ' '.join(TEAMCODES[self.away][1:]).strip() + ' at ' +\
+       ' '.join(TEAMCODES[self.home][1:]).strip()
+		# self.c = padstr(uglyGame[5],2) + ": " +\
+		# uglyGame[1].strftime('%l:%M %p') + ': ' +\
+		# uglyGame[6]
+	
+
+
 def getConfig():
 
 	config_dir = os.path.join(os.environ['HOME'], AUTHDIR)
@@ -40,7 +55,9 @@ def getConfig():
 	config.loads(config_file)
 	
 	return config
-
+#function to clean up listing into a more useful and readable format
+#def niceListing(origList):
+	
 
 def getGames():
 
@@ -70,8 +87,24 @@ def getGames():
 	except (MLBUrlError, MLBXmlError):
 		print "Could not fetch schedule"
 		return -1
-	for i in listings:
-		print str(i) + '\n'
+	Games = []
+	for i in range(len(listings)):
+		Games.append(Listing(listings[i]))
+		#each listing is a list of different info about game
+		#0 is the home and away teams
+		#1 is the start time
+		#2 is available TV streams
+		#3 is radio streams
+		#4 is nothing?, 5 is game status ie if game is in progress, pregame, etc
+		#6 is an easy to parse general info about game
+		#7 is whether or not media is off or on
+		# rest is mostly junk, 10 is available second audio feeds where available
+		print str(listings[i][10]) + '\n'
+		#print Games[i].s
+
+	#eventually I want to get the listings remotely from server using server config
+	#i think i can send my own objects with perspective broker and call remote methods
+
 #def main():
 #	t = Terminal()
 
