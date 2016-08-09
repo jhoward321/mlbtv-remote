@@ -1,6 +1,6 @@
 # pip install Flask-Restless
 from flask import Flask, jsonify
-from flask_restful import Resource, Api, abort, reqparse, fields, marshal_with
+from flask_restful import Resource, Api, abort, inputs, reqparse, fields, marshal_with
 from MLBviewer import *
 import os, time, datetime, json
 
@@ -20,6 +20,7 @@ resource_fields = {
 	'time': fields.String,
 	's': fields.String
 }
+
 
 # Object to store game info in a more readable form
 class Listing(object):
@@ -43,9 +44,13 @@ class Listing(object):
 class GameList(Resource):
 	# date support will be added after i add date support to my listings
 	@marshal_with(resource_fields)
-	def get(self):
+	def get(self): #might wants **kwargs
+		# Argument parsing for game schedules
+		get_args = reqparse.RequestParser()
+		get_args.add_argument('date',type=inputs.date, help='Date of games')
 		#abort_no_games(date) - add this in with date support
-		games = getGames()
+		args = get_args.parse_args(strict=True)
+		games = getGames(args.date) #add in date here
 		return games
 
 # Load config or create new one if one doesn't exist
@@ -105,9 +110,39 @@ def getConfig():
 		
 		return config
 
-# Clean up listings into a more readable format
-def getGames():
-	# each listing is a list of different info about game
+# Get game listings - takes in an optional date if current day isn't wanted
+def getGames(date=None):
+	global config
+
+	now = datetime.datetime.now()
+	gametime = MLBGameTime(now)
+	localtime = time.localtime()
+	localzone = (time.timezone,time.altzone)[localtime.tm_isdst]
+	localoffset = datetime.timedelta(0,localzone)
+	eastoffset = gametime.utcoffset()
+	
+	# current datetime object adjusted for timezones 
+	view_day = now + localoffset - eastoffset
+	# get a timedelta between current (adjusted) date and provided date
+	try:
+		dateOffset = date.date() - view_day.date()
+	except AttributeError:
+		dateOffset = datetime.timedelta(0)
+
+	view_day = view_day + dateOffset
+	sched_date = (view_day.year, view_day.month, view_day.day)
+
+	try:
+		mlbsched = MLBSchedule(ymd_tuple=sched_date)
+		listings = mlbsched.getListings(
+			config.get('speed'),
+			config.get('blackout'))
+	except (MLBUrlError, MLBXmlError):
+		print "Could not fetch schedule"
+		return -1
+	#return listings
+
+	# each listing is a list of different info about game - ugly format from MLBSchedule
 	# 0 is the home and away teams
 	# 1 is the start time
 	# 2 is available TV streams
@@ -116,47 +151,16 @@ def getGames():
 	# 6 is an easy to parse general info about game
 	# 7 is whether or not media is off or on
 	# rest is mostly junk, 10 is available second audio feeds where available
-	listings = getUglyListings()
-	Games = []
-	for i in range(len(listings)):
-		Games.append(Listing(listings[i]))
+
+	# games is a more readable and useful form than listings
+
+	games = []
+	for i in range(len(listings)): 
+		games.append(Listing(listings[i]))
 		#print str(listings[i][10]) + '\n'
-		#print Games[i].s
-	return Games
-
-# Get game listings - ugly format from MLBSchedule
-def getUglyListings():
-
-	global config
-
-	# get date and time information for local and eastern timezones
-	now = datetime.datetime.now()
-	gametime = MLBGameTime(now)
-	localtime = time.localtime()
-	localzone = (time.timezone,time.altzone)[localtime.tm_isdst]
-	localoffset = datetime.timedelta(0,localzone)
-	eastoffset = gametime.utcoffset()
-
-	#once I'm farther along I will add time offset support
-
-	view_day = now + localoffset - eastoffset
-	sched_date = (view_day.year, view_day.month, view_day.day)
-	#print view_day
-	#print sched_date
-
-	#get game listing for requested day (other dates to be added)
-	try:
-		mlbsched = MLBSchedule(ymd_tuple=sched_date)
-		#print mlbsched
-		listings = mlbsched.getListings(
-			config.get('speed'),
-			config.get('blackout'))
-	except (MLBUrlError, MLBXmlError):
-		print "Could not fetch schedule"
-		return -1
-
-	return listings
-
+ 		#print Games[i].s
+	return games
+	
 # initialize session, load config etc
 def main():
 	global config
