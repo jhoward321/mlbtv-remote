@@ -166,9 +166,13 @@ def getListings():
 def setupWindow(myscr,mycfg, games):
 	#need to configure myscreen first
 	listwin = MLBListWin(myscr, mycfg, games)
-def main(myscr,mycfg, games):
+def main():
 	#t = Terminal()
-	#games = getGames()
+	minconfig = getConfig()
+	listings = getListings()
+	games = getGames(listings)
+	for i in games:
+		print i.s
 	# for i in range(len(games)):
 	# 	with t.location(0,t.height + i):
 	# 		print games[i].s
@@ -177,11 +181,11 @@ def main(myscr,mycfg, games):
 	#		print t.underline(games[0].s) 
 	
 	#might be able to use interface from MLBListWin, MLBTopWin,opt,help etc
-	listwin = MLBListWin(myscr, mycfg, games)
+	#listwin = MLBListWin(myscr, mycfg, games)
 
 if __name__ == "__main__":
 	#getGames()
-	#main()
-	minconfig = getConfig()
-	listings = getListings()
-	wrapper(main, minconfig, listings)
+	main()
+	#minconfig = getConfig()
+	#listings = getListings()
+	#wrapper(main, minconfig, listings)
