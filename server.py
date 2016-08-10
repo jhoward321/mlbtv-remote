@@ -17,19 +17,35 @@ config = None
 resource_fields = {
 	'home': fields.String,
 	'away': fields.String,
-	'time': fields.String,
-	's': fields.String
+	'time': fields.DateTime,
+	's': fields.String,
+	'tv': fields.List(fields.Raw),
+	'status': fields.String
 }
 
 
 # Object to store game info in a more readable form
 class Listing(object):
+	# each uglyGame is a list of different info about game - from MLBSchedule
+	# 0 is the home and away teams
+	# 1 is the start time
+	# 2 is available TV streams
+	# 3 is radio streams
+	# 4 is nothing?, 5 is game status ie if game is in progress, pregame, etc
+	# 6 is an easy to parse general info about game
+	# 7 is whether or not media is off or on
+	# rest is mostly junk, 10 is available second audio feeds where available
+
 	def __init__(self, uglyGame):
 		self.home = uglyGame[0]['home']
 		self.away = uglyGame[0]['away']
-		self.time = uglyGame[1].strftime('%l:%M %p')
+		self.status = uglyGame[5]
+		self.tv = uglyGame[2]
+		#self.time = uglyGame[1].strftime('%l:%M %p')
+		self.time = uglyGame[1] #might be better to keep this as a time object
 		self.s = ' '.join(TEAMCODES[self.away][1:]).strip() + ' at ' +\
     		' '.join(TEAMCODES[self.home][1:]).strip()
+
 		#self.c = padstr(uglyGame[5],2) + ": " +\
 		#	uglyGame[1].strftime('%l:%M %p') + ': ' +\
 		#	uglyGame[6]
@@ -142,23 +158,11 @@ def getGames(date=None):
 		return -1
 	#return listings
 
-	# each listing is a list of different info about game - ugly format from MLBSchedule
-	# 0 is the home and away teams
-	# 1 is the start time
-	# 2 is available TV streams
-	# 3 is radio streams
-	# 4 is nothing?, 5 is game status ie if game is in progress, pregame, etc
-	# 6 is an easy to parse general info about game
-	# 7 is whether or not media is off or on
-	# rest is mostly junk, 10 is available second audio feeds where available
-
 	# games is a more readable and useful form than listings
 
 	games = []
-	for i in range(len(listings)): 
-		games.append(Listing(listings[i]))
-		#print str(listings[i][10]) + '\n'
- 		#print Games[i].s
+	for game in listings:
+		games.append(Listing(game))
 	return games
 	
 # initialize session, load config etc
