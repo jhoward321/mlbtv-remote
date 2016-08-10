@@ -1,6 +1,8 @@
 # pip install Flask-Restless
 from flask import Flask, jsonify
+#reqparse is being deprecated for marshmallow in flask_restful
 from flask_restful import Resource, Api, abort, inputs, reqparse, fields, marshal_with
+#from marshmallow import Schema, fields, pprint
 from MLBviewer import *
 import os, time, datetime, json
 
@@ -13,7 +15,8 @@ session = None
 # Config placeholder
 config = None
 
-#used to serialize Listing object
+# used to serialize Listing object
+# This will be redone to serialize with marshmallow for future compatibility
 resource_fields = {
 	'home': fields.String,
 	'away': fields.String,
