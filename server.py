@@ -1,8 +1,8 @@
 # pip install Flask-Restless
 from flask import Flask, jsonify
 #reqparse is being deprecated for marshmallow in flask_restful
-from flask_restful import Resource, Api, abort, inputs, reqparse, fields, marshal_with
-#from marshmallow import Schema, fields, pprint
+from flask_restful import Resource, Api, abort, inputs, reqparse#, marshal_with, reqparse, fields
+from marshmallow import Schema, fields, pprint
 from MLBviewer import *
 import os, time, datetime, json
 
@@ -11,28 +11,37 @@ api = Api(app)
 
 # Session placeholder
 session = None
-
 # Config placeholder
 config = None
+# Current game placeholder
+cur_game = None
 
 # used to serialize Listing object
 # This will be redone to serialize with marshmallow for future compatibility
-resource_fields = {
-	'home': fields.String,
-	'away': fields.String,
-	'time': fields.DateTime,
-	's': fields.String,
-	'tv': fields.List(fields.Raw),
-	'status': fields.String
-}
-
+# resource_fields = {
+# 	'home': fields.String,
+# 	'away': fields.String,
+# 	'time': fields.DateTime,
+# 	'summary': fields.String,
+# 	#'tv': fields.List(fields.Raw),
+# 	'status': fields.String
+# }
+# Marshmallow serialization for Listing object
+class ListingSchema(Schema):
+	home = fields.String()
+	away = fields.String()
+	time = fields.DateTime() #could also use old string format
+	summary = fields.String()
+	status = fields.String()
+	tv = fields.List(fields.List(fields.String()))
 
 # Object to store game info in a more readable form
 class Listing(object):
 	# each uglyGame is a list of different info about game - from MLBSchedule
 	# 0 is the home and away teams
 	# 1 is the start time
-	# 2 is available TV streams
+	# 2 is available TV streams - this is a list of lists where each list 
+		# is stream info. First list is home teams stream info, second is away
 	# 3 is radio streams
 	# 4 is nothing?, 5 is game status ie if game is in progress, pregame, etc
 	# 6 is an easy to parse general info about game
@@ -46,7 +55,7 @@ class Listing(object):
 		self.tv = uglyGame[2]
 		#self.time = uglyGame[1].strftime('%l:%M %p')
 		self.time = uglyGame[1] #might be better to keep this as a time object
-		self.s = ' '.join(TEAMCODES[self.away][1:]).strip() + ' at ' +\
+		self.summary = ' '.join(TEAMCODES[self.away][1:]).strip() + ' at ' +\
     		' '.join(TEAMCODES[self.home][1:]).strip()
 
 		#self.c = padstr(uglyGame[5],2) + ": " +\
@@ -54,23 +63,57 @@ class Listing(object):
 		#	uglyGame[6]
 
 
-# shows info about a game 
-# class Game(Resource):
-# 	def get(self, game_id):
+# Show info about a particular game - probably need some sort of date thing
+#class Game(Resource):
+#	def get(self, game_id):
+
+# Resource for starting a particular stream - return info about stream playing
+class Play(Resource):
+	# https://stackoverflow.com/questions/630453/put-vs-post-in-rest
+	# GET will return info about current state (ie whether a game is playing)
+	# PUT will play a certain game (ie change state)
+	def put(self, game_id):
+		global config
+		global session
+		global cur_game
+		
+		# First check state
+		if config is None:
+			getConfig()
+		if session is None:
+			try:
+				session = getSession(config)
+			except MLBAuthError:
+				abort(404,message="Could not login, check config")
+		if cur_game is None:
+			#start playing game
+			temp = 1
+		else:
+			return cur_game
 
 
 # shows a list of all games for a certain date
 class GameList(Resource):
-	# date support will be added after i add date support to my listings
-	@marshal_with(resource_fields)
-	def get(self): #might wants **kwargs
-		# Argument parsing for game schedules
+
+	# @marshal_with(resource_fields)
+	# def get(self): #might wants **kwargs
+	# 	# Argument parsing for game schedules
+	# 	get_args = reqparse.RequestParser()
+	# 	get_args.add_argument('date',type=inputs.date, help='Date of games')
+	# 	#abort_no_games(date) - add this in with date support
+	# 	args = get_args.parse_args(strict=True)
+	# 	games = getGames(args.date)
+	# 	return games
+
+	#alternative with marshmallow
+	def get(self):
 		get_args = reqparse.RequestParser()
 		get_args.add_argument('date',type=inputs.date, help='Date of games')
-		#abort_no_games(date) - add this in with date support
 		args = get_args.parse_args(strict=True)
-		games = getGames(args.date) #add in date here
-		return games
+		games = getGames(args.date)
+		schema = ListingSchema(many=True) #to serialize collections of objects
+		#change dump to dumps if want to return in json format
+		return schema.dump(games).data
 
 # Load config or create new one if one doesn't exist
 def getConfig():
@@ -167,6 +210,19 @@ def getGames(date=None):
 	for game in listings:
 		games.append(Listing(game))
 	return games
+
+# Create MLB.tv session - will need to send error code back on a failed login
+def getSession(config):	
+		try:
+			session = MLBSession(user=config.get('user'),passwd=config.get('pass'),debug=config.get('debug'))
+			session.getSessionData()
+		except MLBAuthError, e:
+			print "Login Failed"
+			return e
+		config.set('cookies', {})
+		config.set('cookies',session.cookies)
+		config.set('cookie_jar', session.cookie_jar)
+		return session
 	
 # initialize session, load config etc
 def main():
@@ -175,6 +231,8 @@ def main():
 
 	# Load config
 	config = getConfig()
+	# Login and start a session
+	#session = getSession(config)
 
 	#listings = getUglyListings()
 	#print listings[0]#[6]
@@ -185,8 +243,9 @@ def main():
 		#newformat = {'home': i.home, 'away' : i.away, 's' : i.s}
 		#print json.dumps(newformat)
 
-# Setup the Api resource routing
-api.add_resource(GameList,'/')
+# Api Routings - subject to change
+api.add_resource(GameList,'/schedule', '/')
+# api.add_resource(Game,'/play/<game_id>')
 
 if __name__ == "__main__":
 	main()
