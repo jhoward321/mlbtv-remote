@@ -91,6 +91,7 @@ class Play(Resource):
 			# Will want to verify this error code is working correctly
 			except MLBAuthError:
 				abort(404,message="Could not login, check config")
+				session = None
 		if cur_game is None:
 			#start playing game
 			cur_game = game_id
@@ -225,9 +226,9 @@ def getSession(config):
 		try:
 			session = MLBSession(user=config.get('user'),passwd=config.get('pass'),debug=config.get('debug'))
 			session.getSessionData()
-		except MLBAuthError, e:
+		except MLBAuthError as e:
 			print "Login Failed"
-			return e
+			raise e
 		config.set('cookies', {})
 		config.set('cookies',session.cookies)
 		config.set('cookie_jar', session.cookie_jar)
