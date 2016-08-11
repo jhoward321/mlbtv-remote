@@ -1,10 +1,11 @@
 # pip install Flask-Restless
-from flask import Flask, jsonify
+from flask import Flask#, jsonify
 #reqparse is being deprecated for marshmallow in flask_restful
 from flask_restful import Resource, Api, abort, inputs, reqparse#, marshal_with, reqparse, fields
 from marshmallow import Schema, fields, pprint
 from MLBviewer import *
-import os, time, datetime, json
+import os, time, datetime#, json
+import subprocess
 
 app = Flask(__name__)
 api = Api(app)
@@ -15,6 +16,8 @@ session = None
 config = None
 # Current game placeholder
 cur_game = None
+# Media player process placeholder
+player = None
 
 # used to serialize Listing object
 # This will be redone to serialize with marshmallow for future compatibility
@@ -68,6 +71,7 @@ class Listing(object):
 #	def get(self, game_id):
 
 # Resource for starting a particular stream - return info about stream playing
+# mlbplay.py takes in stream info in form mlbplay.py i=[inning] v=
 class Play(Resource):
 	# https://stackoverflow.com/questions/630453/put-vs-post-in-rest
 	# GET will return info about current state (ie whether a game is playing)
@@ -79,15 +83,20 @@ class Play(Resource):
 		
 		# First check state
 		if config is None:
-			getConfig()
+			config = getConfig()
+		# might not even need session if its taken care of by mlbplay
 		if session is None:
 			try:
 				session = getSession(config)
+			# Will want to verify this error code is working correctly
 			except MLBAuthError:
 				abort(404,message="Could not login, check config")
 		if cur_game is None:
 			#start playing game
-			temp = 1
+			cur_game = game_id
+			# Need some error handling here
+			cmd = 'python mlbviewer-svn/mlbplay.py v=%s'%game_id
+			player = subprocess.Popen(cmd.split())
 		else:
 			return cur_game
 
@@ -105,7 +114,7 @@ class GameList(Resource):
 	# 	games = getGames(args.date)
 	# 	return games
 
-	#alternative with marshmallow
+	#alternative with marshmallow - will probably want to implement error codes
 	def get(self):
 		get_args = reqparse.RequestParser()
 		get_args.add_argument('date',type=inputs.date, help='Date of games')
@@ -245,6 +254,7 @@ def main():
 
 # Api Routings - subject to change
 api.add_resource(GameList,'/schedule', '/')
+api.add_resource(Play,'/play/<game_id>')
 # api.add_resource(Game,'/play/<game_id>')
 
 if __name__ == "__main__":
