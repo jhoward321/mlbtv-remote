@@ -76,28 +76,55 @@ class Play(Resource):
 	# https://stackoverflow.com/questions/630453/put-vs-post-in-rest
 	# GET will return info about current state (ie whether a game is playing)
 	# PUT will play a certain game (ie change state)
-	def put(self, game_id):
-		global config
-		global session
+	# Think i want to have teamcode and date in url, inning and speed as options
+	def put(self, team_code):
+		#global config
+		#global session
 		global cur_game
 		
-		# First check state
-		if config is None:
-			config = getConfig()
-		# might not even need session if its taken care of by mlbplay
-		if session is None:
-			try:
-				session = getSession(config)
-			# Will want to verify this error code is working correctly
-			except MLBAuthError:
-				abort(404,message="Could not login, check config")
-				session = None
+		# First check state - also might not be needed if everything handled my mlbplay
+		# if config is None:
+		# 	config = getConfig()
+		# # might not even need session if its taken care of by mlbplay
+		# if session is None:
+		# 	try:
+		# 		session = getSession(config)
+		# 	# Will want to verify this error code is working correctly
+		# 	except MLBAuthError:
+		# 		abort(404,message="Could not login, check config")
+		# 		session = None
+
+		# 1. Check for options - teamcode required, rest optional through request args - might change this
+		# only teamcode is required, 
+		# Want to be able to specify team, date, inning, and speed
+		# Might eventually add nexdef support but not now
+		# STREAM_SPEEDS = ( '300', '500', '1200', '1800', '2400' )
+		get_args = reqparse.RequestParser()
+		get_args.add_argument('date', type=inputs.date,help='Date of game in form [yyyy]-[mm]-[dd]')
+		get_args.add_argument('inning',type=inputs.regex('^[tb]([1-9]|1[0-9])$'),help='Inning must be in form t[inning] or b[inning]. Ex: t9 for top of the 9th')
+		get_args.add_argument('speed', type=inputs.regex('^(300|500|1200|1800|2400)$'),help='Valid speeds are 300, 500, 1200, 1800, and 2400')
+		args = get_args.parse_args(strict=True)
+		
+		cmd = 'python mlbplay.py v={}'.format(team_code)
+		if args.date is not None:
+			date = args.date.strftime(' j=%m/%d/%y')
+			cmd += date
+		if args.inning is not None:
+			cmd += ' i={}'.format(args.inning)
+		if args.speed is not None:
+			cmd += ' p={}'.format(args.speed)
+		
 		if cur_game is None:
 			#start playing game
-			cur_game = game_id
-			# Need some error handling here
-			cmd = 'python mlbviewer-svn/mlbplay.py v=%s'%game_id
-			player = subprocess.Popen(cmd.split())
+			cur_game = team_code
+			try:
+				player = subprocess.Popen(cmd.split(),cwd='mlbviewer-svn/',stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+				print player.communicate()
+			except Exception, e:
+
+				print "failed"
+			#output, error = player.communicate()
+			#can try processing error message via pipe or via stdout
 		else:
 			return cur_game
 
@@ -254,8 +281,8 @@ def main():
 		#print json.dumps(newformat)
 
 # Api Routings - subject to change
-api.add_resource(GameList,'/schedule', '/')
-api.add_resource(Play,'/play/<game_id>')
+api.add_resource(GameList,'/schedule', '/') #probably want to add date options here
+api.add_resource(Play,'/play/<team_code>')
 # api.add_resource(Game,'/play/<game_id>')
 
 if __name__ == "__main__":
