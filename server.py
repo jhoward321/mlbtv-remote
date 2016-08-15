@@ -4,7 +4,7 @@ from flask import Flask#, jsonify
 from flask_restful import Resource, Api, abort, inputs, reqparse#, marshal_with, reqparse, fields
 from marshmallow import Schema, fields, pprint
 from MLBviewer import *
-import os, time, datetime#, json
+import os, time, datetime, threading
 import subprocess
 
 app = Flask(__name__)
@@ -65,10 +65,27 @@ class Listing(object):
 		#	uglyGame[1].strftime('%l:%M %p') + ': ' +\
 		#	uglyGame[6]
 
+# Object to store stream info - can't use listing because of the way mlbplay.py works
+#class StreamInfo(object):
+#	def __init__(self, home=)
 
-# Show info about a particular game - probably need some sort of date thing
-#class Game(Resource):
-#	def get(self, game_id):
+# helper function running in separate thread to check if player had errors
+# will add more functionality here such as parsing different errors
+def checkAlive():
+	global cur_game
+	global player
+
+	try:
+		error = player.communicate()[1]
+	except AttributeError, e:
+		return
+
+	# Due to constraints of python subprocesses, I have to manually search for exceptions 
+	if "Traceback" in error:
+		print error
+	# communicate waits for process to end, so if we get here then we can reset both to None
+	cur_game = None
+	player = None
 
 # Resource for starting a particular stream - return info about stream playing
 # mlbplay.py takes in stream info in form mlbplay.py i=[inning] v=
@@ -76,12 +93,12 @@ class Play(Resource):
 	# https://stackoverflow.com/questions/630453/put-vs-post-in-rest
 	# GET will return info about current state (ie whether a game is playing)
 	# PUT will play a certain game (ie change state)
-	# Think i want to have teamcode and date in url, inning and speed as options
+	# Think i want to have teamcode  url, and then date, inning and speed as request options
 	def put(self, team_code):
 		#global config
 		#global session
 		global cur_game
-		
+		global player
 		# First check state - also might not be needed if everything handled my mlbplay
 		# if config is None:
 		# 	config = getConfig()
@@ -114,42 +131,46 @@ class Play(Resource):
 		if args.speed is not None:
 			cmd += ' p={}'.format(args.speed)
 		
-		if cur_game is None:
-			#start playing game
+		# case where nothing is already playing
+		if player is None:
+			# start playing game
 			cur_game = team_code
-			try:
-				player = subprocess.Popen(cmd.split(),cwd='mlbviewer-svn/',stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
-				print player.communicate()
-			except Exception, e:
-
-				print "failed"
-			#output, error = player.communicate()
-			#can try processing error message via pipe or via stdout
+			with open(os.devnull, "w") as devnull:
+				# will probably eventually get the cwd from a config file that has mlbviewer location
+				player = subprocess.Popen(cmd.split(),cwd='mlbviewer-svn/',stdout=devnull,stderr=subprocess.PIPE)
+				errorThread = threading.Thread(target=checkAlive).start()
+			return cur_game, 202
+		# case where a stream is already playing
 		else:
+
 			return cur_game
 
 
 # shows a list of all games for a certain date
 class GameList(Resource):
 
-	# @marshal_with(resource_fields)
-	# def get(self): #might wants **kwargs
-	# 	# Argument parsing for game schedules
-	# 	get_args = reqparse.RequestParser()
-	# 	get_args.add_argument('date',type=inputs.date, help='Date of games')
-	# 	#abort_no_games(date) - add this in with date support
-	# 	args = get_args.parse_args(strict=True)
-	# 	games = getGames(args.date)
-	# 	return games
-
-	#alternative with marshmallow - will probably want to implement error codes
-	def get(self):
+	def get(self,team_code=None):
 		get_args = reqparse.RequestParser()
 		get_args.add_argument('date',type=inputs.date, help='Date of games')
 		args = get_args.parse_args(strict=True)
-		games = getGames(args.date)
-		schema = ListingSchema(many=True) #to serialize collections of objects
-		#change dump to dumps if want to return in json format
+
+		# 1st check for an invalid team code
+		if team_code and not TEAMCODES.has_key(team_code):
+			abort(404,message="Invalid teamcode")
+
+		games = getGames(args.date, team_code)
+		# Make sure there was no error in retrieving games
+		try:
+			numgames = len(games)
+			if numgames == 0:
+				# Want to verify that this is actually whats always happening when this code is called
+				abort(404,message="Could not retrieve schedule for this request. No games on this date")
+		# if theres a type error then a -1 error code was returned instead of a list
+		except TypeError:
+			abort(404,message="Could not retrieve schedule for this request.")
+
+		schema = ListingSchema(many=True)
+
 		return schema.dump(games).data
 
 # Load config or create new one if one doesn't exist
@@ -210,7 +231,7 @@ def getConfig():
 		return config
 
 # Get game listings - takes in an optional date if current day isn't wanted
-def getGames(date=None):
+def getGames(date=None, team=None):
 	global config
 
 	now = datetime.datetime.now()
@@ -239,14 +260,20 @@ def getGames(date=None):
 	except (MLBUrlError, MLBXmlError):
 		print "Could not fetch schedule"
 		return -1
-	#return listings
 
 	# games is a more readable and useful form than listings
-
+	# return entire schedule if a team is not mentioned specific game if mentioned - empty list if specified game doesnt exist
 	games = []
-	for game in listings:
-		games.append(Listing(game))
+	#print "Team is {}".format(team)
+	if team is None:
+		for game in listings:
+			games.append(Listing(game))
+	else:
+		for game in listings:
+			if team in game[0].values():
+				games.append(Listing(game))
 	return games
+			
 
 # Create MLB.tv session - will need to send error code back on a failed login
 def getSession(config):	
@@ -281,7 +308,7 @@ def main():
 		#print json.dumps(newformat)
 
 # Api Routings - subject to change
-api.add_resource(GameList,'/schedule', '/') #probably want to add date options here
+api.add_resource(GameList,'/schedule/<team_code>', '/', '/schedule') #probably want to add date options here
 api.add_resource(Play,'/play/<team_code>')
 # api.add_resource(Game,'/play/<game_id>')
 
