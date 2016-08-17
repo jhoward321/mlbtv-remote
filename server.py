@@ -1,6 +1,5 @@
 # pip install Flask-Restless
 from flask import Flask
-#  reqparse is being deprecated for marshmallow in flask_restful
 from flask_restful import Resource, Api, abort, inputs, reqparse
 from marshmallow import Schema, fields, pprint
 from MLBviewer import *
@@ -29,26 +28,29 @@ cleanupEvent = threading.Event()
 class ListingSchema(Schema):
     home = fields.String()
     away = fields.String()
-    time = fields.DateTime()  # could also use old string format
+    time = fields.DateTime()
     summary = fields.String()
     status = fields.String()
     playing = fields.String()
     tv = fields.List(fields.List(fields.String()))
 
-# Object to store game info in a more readable form
-
 
 class Listing(object):
-    # each uglyGame is a list of different info about game - from MLBSchedule
-    # 0 is the home and away teams
-    # 1 is the start time
-    # 2 is available TV streams - this is a list of lists where each list
-        # is stream info. First list is home teams stream info, second is away
-    # 3 is radio streams
-    # 4 is nothing?, 5 is game status ie if game is in progress, pregame, etc
-    # 6 is an easy to parse general info about game
-    # 7 is whether or not media is off or on
-    # rest is mostly junk, 10 is available second audio feeds where available
+
+    """ This class is used to store game info in a more readable form.
+        The listings provided from the mlbviewer (uglyGame) provide lists with
+        useful info at the following indices:
+            - 0 is the home and away teams
+            - 1 is the start time
+            - 2 is available TV streams. This is a list where each list is
+              stream info. First list is home team's stream, second is away
+            - 3 is radio streams (not yet implemented)
+            - 4 is typically empty - might be a special type of stream
+            - 5 is game status ie if a game is in progress, pregame, etc
+            - 6 is easy to parse general info about the game
+            - 7 is whether media is off or on
+            - rest is mostly junk, 10 is available second audio feeds
+    """
 
     def __init__(self, uglyGame):
         self.home = uglyGame[0]['home']
@@ -57,7 +59,7 @@ class Listing(object):
         self.tv = uglyGame[2]
         self.playing = uglyGame[7]
         #  self.time = uglyGame[1].strftime('%l:%M %p')
-        self.time = uglyGame[1]  # might be better to keep this as an object
+        self.time = uglyGame[1]
         self.summary = ' '.join(TEAMCODES[self.away][1:]).strip() + ' at ' +\
             ' '.join(TEAMCODES[self.home][1:]).strip()
 
@@ -88,6 +90,8 @@ def checkAlive(cleanupEvent):
     player = None
     cleanupEvent.set()  # tell other thread that cleanup has finished
     cleanupEvent.clear()
+
+
 # Resource for starting a particular stream - return info about stream playing
 # mlbplay.py takes in stream info in form mlbplay.py i=[inning] v=
 
@@ -98,8 +102,7 @@ class Play(Resource):
     # PUT will play a certain game (ie change state)
     # Think i want to have teamcode url, and then date, inning and speed
     def put(self, team_code):
-        #  global config
-        #  global session
+
         global cur_game
         global player
         global cleanupEvent
@@ -170,7 +173,7 @@ class Play(Resource):
             #  print player
             #  print cur_game
             cleanupEvent.clear()
-            #return schema.dump(game[0]).data
+            #  return schema.dump(game[0]).data
             return schema.dump(cur_game[0]).data, 202
             #  return cur_game
 
