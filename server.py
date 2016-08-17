@@ -22,6 +22,8 @@ config = None
 cur_game = None
 # Media player process placeholder
 player = None
+# Event object for synchronizing threads
+cleanupEvent = threading.Event()
 
 
 class ListingSchema(Schema):
@@ -66,7 +68,7 @@ class Listing(object):
 
 # helper function running in separate thread to check if player had errors
 # will add more functionality here such as parsing different errors
-def checkAlive():
+def checkAlive(cleanupEvent):
     global cur_game
     global player
 
@@ -84,7 +86,8 @@ def checkAlive():
     # really should use a RWlock but it doesnt exist in python
     cur_game = None
     player = None
-
+    cleanupEvent.set()  # tell other thread that cleanup has finished
+    cleanupEvent.clear()
 # Resource for starting a particular stream - return info about stream playing
 # mlbplay.py takes in stream info in form mlbplay.py i=[inning] v=
 
@@ -99,6 +102,7 @@ class Play(Resource):
         #  global session
         global cur_game
         global player
+        global cleanupEvent
 
         # 1. Check for options - teamcode required, rest optional
         # only teamcode is required,
@@ -133,6 +137,8 @@ class Play(Resource):
 
         # case where nothing is already playing
         if player is None:
+            # make sure event not already set
+            cleanupEvent.clear()
             # start playing game
             cur_game = getGames(args.date, team_code)
             with open(os.devnull, "w") as devnull:
@@ -140,22 +146,32 @@ class Play(Resource):
                 player = subprocess.Popen(cmd.split(), cwd='mlbviewer-svn/',
                                           stdout=devnull,
                                           stderr=subprocess.PIPE)
-                errorThread = threading.Thread(target=checkAlive).start()
+                errorThread = threading.Thread(target=checkAlive,
+                                               args=(cleanupEvent,)).start()
             #  could either return list of 1 game or just the game...
             return schema.dump(cur_game[0]).data, 202
             #  return cur_game, 202
         # case where a stream is already playing
         else:
-            game = getGames(args.date, team_code)
             # need to kill player and make sure errorThread is handled
             player.send_signal(signal.SIGINT)
             # want some synchronization mechanisms to prevent race conditions
+            # Event object should let me synch my two threads
+            cleanupEvent.wait(5.0)  # block until cleanup thread finishes
+            cur_game = getGames(args.date, team_code)
 
+            with open(os.devnull, "w") as devnull:
+                player = subprocess.Popen(cmd.split(), cwd='mlbviewer-svn/',
+                                          stdout=devnull,
+                                          stderr=subprocess.PIPE)
+                errorThread = threading.Thread(target=checkAlive,
+                                               args=(cleanupEvent,)).start()
             #  player.communicate()
             #  print player
             #  print cur_game
-            return schema.dump(game[0]).data
-            #  return schema.dump(cur_game[0]).data, 202
+            cleanupEvent.clear()
+            #return schema.dump(game[0]).data
+            return schema.dump(cur_game[0]).data, 202
             #  return cur_game
 
 
@@ -168,7 +184,7 @@ class GameList(Resource):
         args = get_args.parse_args(strict=True)
 
         # 1st check for an invalid team code
-        if team_code and teamc_code not in TEAMCODES:
+        if team_code and team_code not in TEAMCODES:
             abort(404, message="Invalid teamcode")
 
         games = getGames(args.date, team_code)
