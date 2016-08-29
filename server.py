@@ -1,14 +1,17 @@
-# pip install Flask-Restless
+# pip install Flask-Restless, rq, need redis-server
 from flask import Flask
 from flask_restful import Resource, Api, abort, inputs, reqparse
 from marshmallow import Schema, fields, pprint
 from MLBviewer import *
+# from redis import Redis
+# from rq import Queue
 import os
 import time
 import datetime
 import threading
 import signal
 import subprocess
+
 
 app = Flask(__name__)
 api = Api(app)
@@ -89,7 +92,7 @@ def checkAlive(cleanupEvent):
     cur_game = None
     player = None
     cleanupEvent.set()  # tell other thread that cleanup has finished
-    cleanupEvent.clear()
+    # cleanupEvent.clear()
 
 
 # Resource for starting a particular stream - return info about stream playing
@@ -138,44 +141,28 @@ class Play(Resource):
         if args.speed is not None:
             cmd += ' p={}'.format(args.speed)
 
-        # case where nothing is already playing
+        # Case where nothing playing
         if player is None:
-            # make sure event not already set
             cleanupEvent.clear()
-            # start playing game
-            cur_game = getGames(args.date, team_code)
-            with open(os.devnull, "w") as devnull:
-                # will probably eventually get the cwd from a config file
-                player = subprocess.Popen(cmd.split(), cwd='mlbviewer-svn/',
-                                          stdout=devnull,
-                                          stderr=subprocess.PIPE)
-                errorThread = threading.Thread(target=checkAlive,
-                                               args=(cleanupEvent,)).start()
-            #  could either return list of 1 game or just the game...
-            return schema.dump(cur_game[0]).data, 202
-            #  return cur_game, 202
-        # case where a stream is already playing
+        # Case where a game is already playing
+        # There is a bug here with multiple simultaneous requests
+        # where a request will hang until the player is killed
+        # Will be fixed in future versions - need a redis task queue
         else:
-            # need to kill player and make sure errorThread is handled
             player.send_signal(signal.SIGINT)
-            # want some synchronization mechanisms to prevent race conditions
-            # Event object should let me synch my two threads
-            cleanupEvent.wait(5.0)  # block until cleanup thread finishes
-            cur_game = getGames(args.date, team_code)
+            # cleanupEvent.wait(5.0)
+            cleanupEvent.wait()
 
-            with open(os.devnull, "w") as devnull:
-                player = subprocess.Popen(cmd.split(), cwd='mlbviewer-svn/',
-                                          stdout=devnull,
-                                          stderr=subprocess.PIPE)
-                errorThread = threading.Thread(target=checkAlive,
-                                               args=(cleanupEvent,)).start()
-            #  player.communicate()
-            #  print player
-            #  print cur_game
-            cleanupEvent.clear()
-            #  return schema.dump(game[0]).data
-            return schema.dump(cur_game[0]).data, 202
-            #  return cur_game
+        cur_game = getGames(args.date, team_code)
+        with open(os.devnull, "w") as devnull:
+            player = subprocess.Popen(cmd.split(), cwd='mlbviewer-svn/',
+                                      stdout=devnull,
+                                      stderr=subprocess.PIPE)
+            errorThread = threading.Thread(target=checkAlive,
+                                           args=(cleanupEvent,)).start()
+        cleanupEvent.clear()
+        return schema.dump(cur_game[0]).data, 202
+        # return cur_game, 202
 
 
 # shows a list of all games for a certain date
