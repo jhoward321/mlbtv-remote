@@ -86,13 +86,9 @@ def checkAlive(cleanupEvent):
     # I have to manually search for exceptions
     if "Traceback" in error:
         print error
-    # communicate waits for process to end, so if we get here then we can reset
-    # both to None. Need some sort of synchronization mechanism here eventually
-    # really should use a RWlock but it doesnt exist in python
     cur_game = None
     player = None
     cleanupEvent.set()  # tell other thread that cleanup has finished
-    # cleanupEvent.clear()
 
 
 # Resource for starting a particular stream - return info about stream playing
@@ -163,6 +159,19 @@ class Play(Resource):
         cleanupEvent.clear()
         return schema.dump(cur_game[0]).data, 202
         # return cur_game, 202
+
+# Stop game if one is currently playing, otherwise do nothing
+
+class Stop(Resource):
+    def get(self):
+        global player
+        global cleanupEvent
+        if player is None:
+            abort(406, message="No game currently playing")
+        else:
+            player.send_signal(signal.SIGINT)
+            cleanupEvent.wait()
+            return 204
 
 
 # shows a list of all games for a certain date
@@ -339,6 +348,7 @@ def main():
 # Api Routings - subject to change
 api.add_resource(GameList, '/schedule/<team_code>', '/', '/schedule')  # probably want to add date options here
 api.add_resource(Play, '/play/<team_code>')
+api.add_resource(Stop, '/stop')
 # api.add_resource(Game,'/play/<game_id>')
 
 if __name__ == "__main__":
