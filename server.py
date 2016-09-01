@@ -120,6 +120,9 @@ class Play(Resource):
         global player
         global cleanupEvent
 
+        if team_code and team_code not in TEAMCODES:
+            abort(400, message="Invalid teamcode")
+
         # Setup valid requests
         request_args = reqparse.RequestParser()
         request_args.add_argument('date',
@@ -133,23 +136,22 @@ class Play(Resource):
                                   type=inputs.regex('^(300|500|1200|1800|2400)$'),
                                   help='Valid speeds are 300, 500, 1200, 1800, and 2400')
 
-        # object storing received request arguments
         parsed_args = request_args.parse_args(strict=True)
-
         serialization_schema = ListingSchema()
+        start_stream_cmd = 'python mlbplay.py v={}'.format(team_code)
 
-        if team_code and team_code not in TEAMCODES:
-            abort(400, message="Invalid teamcode")
-
-        cmd = 'python mlbplay.py v={}'.format(team_code)
-
+        # Alter command string based off arguments
         if parsed_args.date is not None:
             date = parsed_args.date.strftime(' j=%m/%d/%y')
-            cmd += date
+            start_stream_cmd += date
+
         if parsed_args.inning is not None:
-            cmd += ' i={}'.format(parsed_args.inning)
+            inning = ' i={}'.format(parsed_args.inning)
+            start_stream_cmd += inning
+
         if parsed_args.speed is not None:
-            cmd += ' p={}'.format(parsed_args.speed)
+            speed = ' p={}'.format(parsed_args.speed)
+            start_stream_cmd += speed
 
         # Case where nothing playing
         if player is None:
@@ -165,7 +167,7 @@ class Play(Resource):
 
         cur_game = getGames(parsed_args.date, team_code)
         with open(os.devnull, "w") as devnull:
-            player = subprocess.Popen(cmd.split(), cwd='mlbviewer-svn/',
+            player = subprocess.Popen(start_stream_cmd.split(), cwd='mlbviewer-svn/',
                                       stdout=devnull,
                                       stderr=subprocess.PIPE)
             errorThread = threading.Thread(target=checkAlive,
