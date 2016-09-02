@@ -156,25 +156,28 @@ class Play(Resource):
         # Case where nothing playing
         if player is None:
             cleanupEvent.clear()
+
         # Case where a game is already playing
-        # There is a bug here with multiple simultaneous requests
-        # where a request will hang until the player is killed
-        # Will be fixed in future versions - need a redis task queue
+        # TODO: Fix occasional synchronization issue
         else:
             player.send_signal(signal.SIGINT)
-            # cleanupEvent.wait(5.0)
             cleanupEvent.wait()
 
         cur_game = getGames(parsed_args.date, team_code)
+
         with open(os.devnull, "w") as devnull:
-            player = subprocess.Popen(start_stream_cmd.split(), cwd='mlbviewer-svn/',
+            # TODO: make mlbviewer directory configurable
+            player = subprocess.Popen(start_stream_cmd.split(),
+                                      cwd='mlbviewer-svn/',
                                       stdout=devnull,
                                       stderr=subprocess.PIPE)
             errorThread = threading.Thread(target=checkAlive,
                                            args=(cleanupEvent,)).start()
+
         cleanupEvent.clear()
-        return serialization_schema.dump(cur_game[0]).data, 202
-        # return cur_game, 202
+        serialized_game_info = serialization_schema.dump(cur_game[0]).data
+        return serialized_game_info, 202
+
 
 # Stop game if one is currently playing, otherwise do nothing
 
