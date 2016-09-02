@@ -44,42 +44,52 @@ class ListingSchema(Schema):
 
 class Listing(object):
 
-    """ This class is used to store game info in a more readable form.
-        The listings provided from the mlbviewer (uglyGame) provide lists with
-        useful info at the following indices:
-            - 0 is the home and away teams
-            - 1 is the start time
-            - 2 is available TV streams. This is a list where each list is
-              stream info. First list is home team's stream, second is away
-            - 3 is radio streams (not yet implemented)
-            - 4 is typically empty - might be a special type of stream
-            - 5 is game status ie if a game is in progress, pregame, etc
-            - 6 is easy to parse general info about the game
-            - 7 is whether media is off or on
-            - rest is mostly junk, 10 is available second audio feeds
+    """This class is used to store game info in a more readable form.
+       The listings provided from mlbviewer (uglyGame) provide lists with
+       useful info at the following indices:
+        - 0 is the home and away teams
+        - 1 is the start time
+        - 2 is available TV streams. This is a list where each list is
+          stream info. First list is home team's stream, second is away
+        - 3 is radio streams (not yet implemented)
+        - 4 is typically empty - might be a special type of stream
+        - 5 is game status ie if a game is in progress, pregame, etc
+        - 6 is easy to parse general info about the game
+        - 7 is whether media is off or on
+        - rest is mostly junk, 10 is available second audio feeds
+
+    Attributes:
+        away (TYPE): Description
+        home (TYPE): Description
+        playing (TYPE): Description
+        status (TYPE): Description
+        summary (TYPE): Description
+        time (TYPE): Description
+        tv (TYPE): Description
     """
 
     def __init__(self, uglyGame):
+        """Initilization function for game Listing object
+
+        Args:
+            uglyGame (list): List containing lists of game info from
+            the MLBSchedule class
+        """
         self.home = uglyGame[0]['home']
         self.away = uglyGame[0]['away']
         self.status = uglyGame[5]
         self.tv = uglyGame[2]
         self.playing = uglyGame[7]
-        #  self.time = uglyGame[1].strftime('%l:%M %p')
         self.time = uglyGame[1]
         self.summary = ' '.join(TEAMCODES[self.away][1:]).strip() + ' at ' +\
             ' '.join(TEAMCODES[self.home][1:]).strip()
-
-        #  self.c = padstr(uglyGame[5],2) + ": " +\
-        #   uglyGame[1].strftime('%l:%M %p') + ': ' +\
-        #   uglyGame[6]
 
 
 def checkAlive(cleanupEvent):
     """Helper function spawned in a separate thread to detect when a stream ends
 
     Args:
-        cleanupEvent (Event): a threading Event object to for synchronization
+        cleanupEvent (Event): a threading Event object for synchronization
     """
     global cur_game
     global player
@@ -176,13 +186,19 @@ class Play(Resource):
 
         cleanupEvent.clear()
         serialized_game_info = serialization_schema.dump(cur_game[0]).data
-        return serialized_game_info, 202
+        return serialized_game_info, 200
 
-
-# Stop game if one is currently playing, otherwise do nothing
 
 class Stop(Resource):
+    """flask_restful Resource for stopping a stream. Does nothing
+       if no game is playing.
+    """
     def get(self):
+        """Stop MLBTv stream. Called with an HTTP GET request
+
+        Returns:
+            status_code: http status code of the request
+        """
         global player
         global cleanupEvent
         if player is None:
@@ -190,7 +206,7 @@ class Stop(Resource):
         else:
             player.send_signal(signal.SIGINT)
             cleanupEvent.wait()
-            return 204
+            return 200
 
 
 # shows a list of all games for a certain date
