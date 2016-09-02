@@ -211,31 +211,45 @@ class Stop(Resource):
 
 # shows a list of all games for a certain date
 class GameList(Resource):
-
+    """flask_restful Resource for retrieving game schedule for a specified date
+    """
     def get(self, team_code=None):
-        request_args = reqparse.RequestParser()
-        request_args.add_argument('date', type=inputs.date, help='Date of games')
-        parsed_args = request_args.parse_args(strict=True)
+        """Retrieve a single team's game for a date, or all the games for a date.
 
-        # 1st check for an invalid team code
+        Args:
+            team_code (None, optional): used if you only want info for 1 game.
+
+        Request Params (optional):
+            date (str): date of game in form YYYY-mm-dd. Defaults to today
+
+        Returns:
+            ListType: list object of game Listing objects. List has 1 Listing
+            if a team_code was specified.
+        """
+
         if team_code and team_code not in TEAMCODES:
             abort(404, message="Invalid teamcode")
 
+        # Setup valid requests
+        request_args = reqparse.RequestParser()
+        request_args.add_argument('date', type=inputs.date, help='Date of games')
+
+        parsed_args = request_args.parse_args(strict=True)
         games = getGames(parsed_args.date, team_code)
+
         # Make sure there was no error in retrieving games
         try:
             numgames = len(games)
             if numgames == 0:
-                # Want to verify that this is actually whats always happening when this code is called
-                abort(404, message="Could not retrieve schedule for "\
+                abort(404, message="Could not retrieve schedule for "
                       "this request. No games on this date")
         # if theres a type error then a -1 error code was returned
         except TypeError:
             abort(404, message="Could not retrieve schedule for this request.")
 
         serialization_schema = ListingSchema(many=True)
-
-        return serialization_schema.dump(games).data
+        serialized_game_info = serialization_schema.dump(games).data
+        return serialized_game_info
 
 # Load config or create new one if one doesn't exist
 
