@@ -92,6 +92,10 @@ class Play(Resource):
     def put(self, team_code):
         """Start game and return info about the game. Called with an HTTP PUT request
 
+        TODO: implement additional stream options, have more error checking for
+        when media is not yet available, figure out minor synch issue,
+        figure out speed/inning issue. Speed seems to only work for 1200/1800
+
         Args:
             team_code (str): team code used to specify game
 
@@ -111,6 +115,7 @@ class Play(Resource):
             abort(400, message="Invalid teamcode")
 
         # Setup valid requests
+        # TODO: implement more stream options, fix innings/speed implementation
         request_args = reqparse.RequestParser()
         request_args.add_argument('date',
                                   type=inputs.date,
@@ -125,13 +130,9 @@ class Play(Resource):
 
         parsed_args = request_args.parse_args(strict=True)
         serialization_schema = ListingSchema()
-        start_stream_cmd = 'python mlbplay.py v={}'.format(team_code)
+        start_stream_cmd = 'python mlbplay.py'
 
         # Alter command string based off arguments
-        if parsed_args.date is not None:
-            date = parsed_args.date.strftime(' j=%m/%d/%y')
-            start_stream_cmd += date
-
         if parsed_args.inning is not None:
             inning = ' i={}'.format(parsed_args.inning)
             start_stream_cmd += inning
@@ -139,6 +140,15 @@ class Play(Resource):
         if parsed_args.speed is not None:
             speed = ' p={}'.format(parsed_args.speed)
             start_stream_cmd += speed
+
+        if parsed_args.date is not None:
+            date = parsed_args.date.strftime(' j=%m/%d/%y')
+            start_stream_cmd += date
+
+        team = ' v={}'.format(team_code)
+        print start_stream_cmd
+        start_stream_cmd += team
+        print start_stream_cmd
 
         # Case where nothing playing
         if player is None:
