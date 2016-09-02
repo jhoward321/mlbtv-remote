@@ -23,6 +23,17 @@ cleanupEvent = None
 
 
 class ListingSchema(Schema):
+    """Marshmallow schema for serializing Listing objects
+
+    Attributes:
+        away (str): away team
+        home (str): home team
+        playing (str): whether a stream is active or not
+        status (str): status code of whether game is in play, over, etc
+        summary (str): basic summary of the game info
+        time (str): time of a game
+        tv (list): list of tv streams available for a game
+    """
     home = fields.String()
     away = fields.String()
     time = fields.DateTime()
@@ -49,13 +60,13 @@ class Listing(object):
         - rest is mostly junk, 10 is available second audio feeds
 
     Attributes:
-        away (TYPE): Description
-        home (TYPE): Description
-        playing (TYPE): Description
-        status (TYPE): Description
-        summary (TYPE): Description
-        time (TYPE): Description
-        tv (TYPE): Description
+        away (TYPE): away team
+        home (TYPE): home team
+        playing (TYPE): whether a stream is active or not
+        status (TYPE): status code of whether game is in play, over, etc
+        summary (TYPE): basic summary of the game info
+        time (TYPE): time of a game
+        tv (TYPE): list of tv streams available for a game
     """
 
     def __init__(self, uglyGame):
