@@ -16,20 +16,10 @@ import subprocess
 app = Flask(__name__)
 api = Api(app)
 
-# Session placeholder
-session = None
-
-# Config placeholder
 config = None
-
-# Current game placeholder
 cur_game = None
-
-# Media player process placeholder
 player = None
-
-# Event object for synchronizing threads
-cleanupEvent = threading.Event()
+cleanupEvent = None
 
 
 class ListingSchema(Schema):
@@ -83,30 +73,6 @@ class Listing(object):
         self.time = uglyGame[1]
         self.summary = ' '.join(TEAMCODES[self.away][1:]).strip() + ' at ' +\
             ' '.join(TEAMCODES[self.home][1:]).strip()
-
-
-def checkAlive(cleanupEvent):
-    """Helper function spawned in a separate thread to detect when a stream ends
-
-    Args:
-        cleanupEvent (Event): a threading Event object for synchronization
-    """
-    global cur_game
-    global player
-
-    try:
-        error = player.communicate()[1]
-    except AttributeError, e:
-        return
-
-    # Due to constraints of python subprocesses,
-    # I have to manually search for exceptions
-    if "Traceback" in error:
-        print error
-    cur_game = None
-    player = None
-    # tell main thread that cleanup has finished
-    cleanupEvent.set()
 
 
 class Play(Resource):
@@ -209,7 +175,6 @@ class Stop(Resource):
             return 200
 
 
-# shows a list of all games for a certain date
 class GameList(Resource):
     """flask_restful Resource for retrieving game schedule for a specified date
     """
@@ -251,10 +216,38 @@ class GameList(Resource):
         serialized_game_info = serialization_schema.dump(games).data
         return serialized_game_info
 
-# Load config or create new one if one doesn't exist
+
+def checkAlive(cleanupEvent):
+    """Helper function spawned in a separate thread to detect when a stream ends
+
+    Args:
+        cleanupEvent (Event): a threading Event object for synchronization
+    """
+    global cur_game
+    global player
+
+    try:
+        error = player.communicate()[1]
+    except AttributeError, e:
+        return
+
+    # Due to constraints of python subprocesses,
+    # I have to manually search for exceptions
+    if "Traceback" in error:
+        print error
+    cur_game = None
+    player = None
+    # tell main thread that cleanup has finished
+    cleanupEvent.set()
 
 
 def getConfig():
+    """Helper function to load mlbviewer config options or load default options
+       if no config file exists.
+
+    Returns:
+        MLBConfig: MLBConfig object
+    """
     config_dir = os.path.join(os.environ['HOME'], AUTHDIR)
     config_file = os.path.join(config_dir, AUTHFILE)
     mlbviewer_defaults = {'speed': DEFAULT_SPEED,
@@ -310,12 +303,19 @@ def getConfig():
 
     return config
 
-# Get game listings - takes in an optional date if current day isn't wanted
-# Returns a list of games. Specifying a team will return a list with only that one game.
-# Returning a list of only one game makes it easier to reuse code than returning the game data structure itself
-
 
 def getGames(date=None, team=None):
+    """Helper function to get game schedule from MLBSchedule and convert
+       it to a useful form.
+
+    Args:
+        date (None, optional): Date of games to return. Default is current date
+        team (None, optional): optional team code to return game for 1 team
+
+    Returns:
+        list: Returns a list of game Listing objects or empty list if specifed
+              game does not exist. Returns -1 if there was an error
+    """
     global config
 
     if config is None:
@@ -341,68 +341,30 @@ def getGames(date=None, team=None):
 
     try:
         mlbsched = MLBSchedule(ymd_tuple=sched_date)
-        listings = mlbsched.getListings(
-            config.get('speed'),
-            config.get('blackout'))
+        ugly_listings = mlbsched.getListings(config.get('speed'),
+                                             config.get('blackout'))
     except (MLBUrlError, MLBXmlError):
         print "Could not fetch schedule"
         return -1
 
-    # games is a more readable and useful form than listings
-    # return entire schedule if a team is not mentioned specific game if mentioned - empty list if specified game doesnt exist
-    games = []
-    #  print "Team is {}".format(team)
+    pretty_listings = []
+
     if team is None:
-        for game in listings:
-            games.append(Listing(game))
+        for game in ugly_listings:
+            pretty_listings.append(Listing(game))
     else:
-        for game in listings:
+        for game in ugly_listings:
             if team in game[0].values():
-                games.append(Listing(game))
-    return games
-
-# Create MLB.tv session - will need to send error code back on a failed login
+                pretty_listings.append(Listing(game))
+    return pretty_listings
 
 
-def getSession(config):
-        try:
-            session = MLBSession(user=config.get('user'), passwd=config.get('pass'), debug=config.get('debug'))
-            session.getSessionData()
-        except MLBAuthError as e:
-            print "Login Failed"
-            raise e
-        config.set('cookies', {})
-        config.set('cookies', session.cookies)
-        config.set('cookie_jar', session.cookie_jar)
-        return session
-
-# initialize session, load config etc
-
-
-def main():
-    global config
-    global session
-
-    # Load config
-    config = getConfig()
-    # Login and start a session
-    # session = getSession(config)
-
-    # listings = getUglyListings()
-    # print listings[0]#[6]
-    # games = getGames()
-
-    # for i in games:
-    #   print i
-    # newformat = {'home': i.home, 'away' : i.away, 's' : i.s}
-    # print json.dumps(newformat)
-
-# Api Routings - subject to change
-api.add_resource(GameList, '/schedule/<team_code>', '/', '/schedule')  # probably want to add date options here
+# Api Routings
+api.add_resource(GameList, '/schedule/<team_code>', '/', '/schedule')
 api.add_resource(Play, '/play/<team_code>')
 api.add_resource(Stop, '/stop')
-# api.add_resource(Game,'/play/<game_id>')
 
 if __name__ == "__main__":
-    main()
+    config = getConfig()
+    cleanupEvent = threading.Event()
     app.run(debug=True)
