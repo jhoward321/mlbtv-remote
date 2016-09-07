@@ -146,9 +146,7 @@ class Play(Resource):
             start_stream_cmd += date
 
         team = ' v={}'.format(team_code)
-        print start_stream_cmd
         start_stream_cmd += team
-        print start_stream_cmd
 
         # Case where nothing playing
         if player is None:
@@ -169,7 +167,8 @@ class Play(Resource):
                                       stdout=devnull,
                                       stderr=subprocess.PIPE)
             errorThread = threading.Thread(target=checkAlive,
-                                           args=(cleanupEvent,)).start()
+                                           args=(cleanupEvent, cur_game,
+                                                 player,)).start()
 
         cleanupEvent.clear()
         serialized_game_info = serialization_schema.dump(cur_game[0]).data
@@ -238,14 +237,14 @@ class GameList(Resource):
         return serialized_game_info
 
 
-def checkAlive(cleanupEvent):
+def checkAlive(cleanupEvent, cur_game, player):
     """Helper function spawned in a separate thread to detect when a stream ends
 
     Args:
         cleanupEvent (Event): a threading Event object for synchronization
     """
-    global cur_game
-    global player
+    # global cur_game
+    # global player
 
     try:
         error = player.communicate()[1]
