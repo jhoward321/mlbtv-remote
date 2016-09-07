@@ -243,8 +243,6 @@ def checkAlive(cleanupEvent, cur_game, player):
     Args:
         cleanupEvent (Event): a threading Event object for synchronization
     """
-    # global cur_game
-    # global player
 
     try:
         error = player.communicate()[1]

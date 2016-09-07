@@ -1,6 +1,9 @@
 import unittest
 import sys
+import subprocess
+import threading
 import datetime
+import mock
 sys.path.append('../')
 import server
 from MLBviewer import *
@@ -55,6 +58,17 @@ class ServerTestCase(unittest.TestCase):
         assert b'Atlanta Braves at Washington Nationals' in rv.data
         rv2 = self.app.get('/schedule/atl', query_string=test_date)
         assert b'Atlanta Braves at Washington Nationals' in rv.data
+
+    @mock.patch('server.player')
+    def test_checkAlive(self, mock_player):
+        """Check that function correctly sets event"""
+        cleanupEvent = threading.Event()
+        mock_player.communicate.return_value = ['', 'Fake Traceback check']
+        server.checkAlive(cleanupEvent, None, mock_player)
+
+        self.assertTrue(mock_player.communicate.called)
+        self.assertTrue(cleanupEvent.isSet())
+
 
 if __name__ == '__main__':
     unittest.main()
