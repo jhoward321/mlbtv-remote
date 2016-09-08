@@ -14,6 +14,10 @@ class ServerTestCase(unittest.TestCase):
     def setUp(self):
         self.app = server.app.test_client()
         self.config = server.getConfig()
+        mlb_sched = MLBSchedule(ymd_tuple=(2016, 9, 07))
+        ugly_listings = mlb_sched.getListings(self.config.get('speed'),
+                                              self.config.get('blackout'))
+        self.test_game = server.Listing(ugly_listings[0])
 
     def test_getConfig(self):
         """Test getConfig helper function returns a config object"""
@@ -69,6 +73,27 @@ class ServerTestCase(unittest.TestCase):
         self.assertTrue(mock_player.communicate.called)
         self.assertTrue(cleanupEvent.isSet())
 
+    #@mock.patch('server.threading',None)
+    #@mock.patch('server.player')
+    #@mock.patch('server.cur_game', None)
+    @mock.patch('server.getGames')
+    @mock.patch('server.threading')
+    @mock.patch('server.subprocess')
+    def test_Play(self, mock_process, mock_thread, mock_games):
+        # want to test argument parsing, subprocess calls, thread spawn, events, return object
+        date = '2016-09-06'
+        team_code = 'atl'
+        speed = [300, 500, 1200, 1800, 2400]
+        top_inning = 't3'
+        bot_inning = 'b3'
+        server.player = None
+        server.cur_game = None
+        server.cleanupEvent = threading.Event()
+
+        mock_games.return_value = self.
+
+        rv = self.app.put('/play/atl')
+        print rv.data
 
 if __name__ == '__main__':
     unittest.main()
