@@ -388,4 +388,5 @@ api.add_resource(Stop, '/stop')
 if __name__ == "__main__":
     config = getConfig()
     cleanupEvent = threading.Event()
-    app.run(debug=True)
+    # app.run(debug=True)
+    app.run(host='0.0.0.0')
