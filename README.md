@@ -25,7 +25,7 @@ The server is now running, and is ready to accept commands.
 
 ## Usage
 
-After following the setup steps, the server is ready to accept http requests. 
+After following the setup steps, the server is ready to accept http requests. Below I've listed some of the most useful commands.
 
 #### Get current day's game schedule:
 ```
