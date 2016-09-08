@@ -9,15 +9,15 @@ Currently the API will provide MLB game schedules for different dates and teams.
 
 This frontend requires Python, the [mlbviewer project](https://sourceforge.net/p/mlbviewer/code/HEAD/tree/trunk/), and a few python libraries.
 
-1. First download and setup the mlbviewer project:
+* First download and setup the mlbviewer project:
 ```
 $ svn checkout svn://svn.code.sf.net/p/mlbviewer/code/trunk mlbviewer-code
 ```
-2. Install required Python dependencies:
+* Install required Python dependencies:
 ```
 $ sudo pip install flask flask_restful marshmallow
 ```
-3. With server.py in the same folder as the MLBviewer folder:
+* With server.py in the same folder as the MLBviewer folder:
 ```
 $ python server.py
 ```
