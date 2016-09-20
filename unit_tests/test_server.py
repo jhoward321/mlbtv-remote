@@ -28,6 +28,7 @@ class ServerTestCase(unittest.TestCase):
 
     def test_getGames(self):
         """Test getGames helper function for different arguments"""
+        # TODO: Mock a lot of these calls
 
         example_date = datetime.date(2016, 9, 6)
         team_code = 'atl'
@@ -58,7 +59,7 @@ class ServerTestCase(unittest.TestCase):
 
     def test_GameList(self):
         """Test GameList to make sure that its correctly returning games"""
-
+        # TODO: finish all possible cases - mock different calls
         test_date = 'date=2016-09-07'
         rv = self.app.get('/schedule', query_string=test_date)
         assert b'Atlanta Braves at Washington Nationals' in rv.data
