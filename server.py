@@ -89,11 +89,6 @@ class Listing(object):
 class Play(Resource):
     """flask_restful Resource for selecting an MLBTv game"""
 
-    def pi_play():
-        """Helper function to setup omxplayer for native streaming on raspberry pi
-        """
-
-
     def put(self, team_code):
         """Start game and return info about the game. Called with an HTTP PUT request
 
@@ -409,7 +404,7 @@ def pi_setup():
         os.system(mv_cmd)  # this is to get around write permission issues
 
     # Now check if buffer file for omxplayer exists and create if needed
-    if not os.path.isfile(buf_path):
+    if not os.path.exists(buf_path):
         buf_cmd = 'mkfifo {}'.format(buf_path)
         os.system(buf_cmd)
 
