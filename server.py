@@ -167,7 +167,9 @@ class Play(Resource):
             if 'arm' in os.uname()[4]:
                 omx_cmd = 'omxplayer -o hdmi mlbpipe'
                 subprocess.Popen(omx_cmd.split(),
-                                 cwd=os.path.expanduser('~'))
+                                 cwd=os.path.expanduser('~'),
+                                 stdout=devnull,
+                                 stderr=devnull)
 
             # TODO: make mlbviewer directory configurable
             player = subprocess.Popen(start_stream_cmd.split(),
