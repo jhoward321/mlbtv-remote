@@ -3,7 +3,7 @@
 This is a custom API front end for the popular [mlbviewer project](https://sourceforge.net/projects/mlbviewer/). This project is still a work in progress and this README will be updated as I add more functionality. This project was meant to allow me to watch MLBtv on my raspberry pi without having to manually select the game on the device. 
 
 
-Currently the API will provide MLB game schedules for different dates and teams. It will start specified games (MLB.tv account required). I still am adding features and cleaning up bugs, and the code will be cleaned up as I finish features. Future plans include a remote command line interface to start mlbviewer on a separate machine. Right now the API must be used through HTTP requests. 
+Currently the API will provide MLB game schedules for different dates and teams. It will start specified games (MLB.tv account required). I still am adding features and cleaning up bugs, and the code will be cleaned up as I finish features. Future plans include a remote command line interface to start mlbviewer on a separate machine. Right now the API must be used through HTTP requests. The project will use omxplayer for hardware acceleration if run on a raspberry pi, and will use mplayer if used on a typical linux machine.
 
 ##How to Setup
 
