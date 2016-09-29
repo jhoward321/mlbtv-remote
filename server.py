@@ -161,6 +161,14 @@ class Play(Resource):
         cur_game = getGames(parsed_args.date, team_code)
 
         with open(os.devnull, "w") as devnull:
+            # start omxplayer if running on a raspberry pi
+            if 'arm' in os.uname()[4]:
+                omx_cmd = 'omxplayer -o hdmi mlbpipe'
+                subprocess.Popen(omx_cmd.split(),
+                                 cwd=os.path.expanduser('~'),
+                                 stdout=devnull,
+                                 stderr=devnull)
+
             # TODO: make mlbviewer directory configurable
             player = subprocess.Popen(start_stream_cmd.split(),
                                       cwd='mlbviewer-svn/',
@@ -377,6 +385,28 @@ def getGames(date=None, team=None):
     return pretty_listings
 
 
+def pi_setup():
+    """Helper function that's called on raspberry pi in order to use omxplayer
+       instead of mplayer. Omxplayer takes advantage of the pi's hardware
+       decoding.
+    """
+    script_path = '/usr/bin/mplayer'
+    redirect_script = '#!/bin/bash\ncat - > {}/mlbpipe\n'.format(os.path.expanduser('~'))
+    buf_path = '{}/mlbpipe'.format(os.path.expanduser('~'))
+
+    # Create wrapper script if it does not exist
+    if not os.path.isfile(script_path) or (os.path.isfile(script_path) and redirect_script not in open(script_path, 'r').read()):
+        temp_path = '/tmp/mplayer.tmp'
+        mv_cmd = 'sudo mv {0} {1}'.format(temp_path, script_path)
+        with open(temp_path, 'wt') as f:
+            f.write(redirect_script)
+        os.system(mv_cmd)  # this is to get around write permission issues
+
+    # Now check if buffer file for omxplayer exists and create if needed
+    if not os.path.exists(buf_path):
+        buf_cmd = 'mkfifo {}'.format(buf_path)
+        os.system(buf_cmd)
+
 # Api Routings
 api.add_resource(GameList, '/schedule/<team_code>', '/', '/schedule')
 api.add_resource(Play, '/play/<team_code>')
@@ -385,4 +415,8 @@ api.add_resource(Stop, '/stop')
 if __name__ == "__main__":
     config = getConfig()
     cleanupEvent = threading.Event()
-    app.run(debug=True)
+    # Check if running on a raspberry pi to setup omxplayer requirements
+    if 'arm' in os.uname()[4]:
+        pi_setup()
+    # app.run(debug=True)
+    app.run(host='0.0.0.0')
