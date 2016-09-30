@@ -358,8 +358,8 @@ def getGames(date=None, team=None):
     view_day = now + localoffset - eastoffset
     # get a timedelta between current (adjusted) date and provided date
     try:
-        dateOffset = date.date() - view_day.date()
-    except AttributeError:
+        dateOffset = date - view_day.date()
+    except TypeError:  # This happens when no date provided
         dateOffset = datetime.timedelta(0)
 
     view_day = view_day + dateOffset
@@ -382,6 +382,7 @@ def getGames(date=None, team=None):
         for game in ugly_listings:
             if team in game[0].values():
                 pretty_listings.append(Listing(game))
+                break
     return pretty_listings
 
 
